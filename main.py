@@ -3,11 +3,11 @@ import os
 import re
 import string
 import advertools as adv
-
+import random
 
 def compute_exact_counts(text):
-    # Compute the exact number of occurrences of each letter with collections library
-    letter_counts = collections.Counter(text.lower())
+    # Compute the exact number of occurrences of each letter using collections library
+    letter_counts = collections.Counter(text.upper())
     return letter_counts
 
 def process_file(filename):
@@ -25,34 +25,50 @@ def process_file(filename):
         if match:
             language = match.group(1).lower()
             stopwords = set(adv.stopwords[language])
-        text = ' '.join([word for word in text.split() if word.lower() not in stopwords])
+        text = ''.join([word for word in text.split() if word.lower() not in stopwords])
         text = text.translate(str.maketrans('', '', string.punctuation)).upper()
     return text
 
-def estimate_frequent_letters(text, k):
-    # Estimate the k most frequent letters using a data stream algorithm
-    letter_counts = collections.Counter()
-    for letter in text.lower():
-        letter_counts[letter] += 1
-        if len(letter_counts) > k:
-            # Remove the least frequent letter using the Space-Saving Count algorithm with a Decreasing probability counter of 1/2^k
-            min_count = min(letter_counts.values())
-            for letter, count in list(letter_counts.items()):
-                if count == min_count:
-                    del letter_counts[letter]
-    return letter_counts
+def space_saving_count(text, k):
+    probability = 1.0
+    letter_counter = {}
+    letter_probability = {}
+    # Process the text
+    for char in text:
+        # Update letter count (and letter probability if the item is new)
+        if char in letter_counter:
+            letter_counter[char] += 1
+        else:
+            letter_counter[char] = 1
+            letter_probability[char] = probability
+            # Decrease probability with a 1/2^k factor
+            probability *= 0.5
+        # If the counter is full, start the letter removal procedure
+        if len(letter_counter) > k:
+            # Choose a letter to remove based on the probability counter
+            p = random.uniform(0, 1)
+            for char, prob in letter_probability.items():
+                if p < prob:
+                    del letter_counter[char]
+                    del letter_probability[char]
+                    break
+    return letter_counter
 
 def test_estimate_frequent_letters(text, k):
     # Start by computing the exact count for future comparison with estimates
+    errors = []
     exact_counts = compute_exact_counts(text)
     total_error = 0
     # Repeat the approximate count 10 times:
-    for i in range(10):
-        estimate_counts = estimate_frequent_letters(text, k)
-        print(estimate_counts)
-        error = sum(abs(estimate_counts[letter] - exact_counts[letter]) for letter in string.ascii_lowercase)
-        total_error += error
-    average_error = total_error / 26
+    repetitions = 10
+    for i in range(repetitions):
+        estimate_counts = space_saving_count(text, k)
+        error = sum(abs(estimate_counts[letter] - exact_counts[letter]) for letter in exact_counts)
+        errors.append(error)
+    average_error = sum(errors) / repetitions
+    highest_error = max(errors)
+    lowest_error = min(errors)
+    print(f"k={k}\nLowest error: {lowest_error}\nAverage error: {average_error}\nHighest error: {highest_error}\n==========")
     return average_error
 
 def compare_performance(text):
