@@ -4,6 +4,7 @@ import re
 import string
 import advertools as adv
 import random
+from heapq import heappush, heappop
 
 def compute_exact_counts(text):
     # Compute the exact number of occurrences of each letter using collections library
@@ -29,36 +30,41 @@ def process_file(filename):
         text = text.translate(str.maketrans('', '', string.punctuation)).upper()
     return text
 
-def space_saving_count(text, k):
-    probability = 1.0
-    letter_counter = {}
-    letter_probability = {}
-    # Process the text
+def decreasing_probability_count(text):
+    counter = {}
     for char in text:
-        # Update letter count (and letter probability if the item is new)
+        if char not in counter:
+            counter[char] = 0
+        count = counter[char]
+        p = random.uniform(0, 1)
+        if p < 1/(2**count):
+            counter[char] += 1
+        
+
+def space_saving_count(text, k):
+    letter_counter = {}
+    heap = []
+    for char in text:
+        # Update letter count
         if char in letter_counter:
             letter_counter[char] += 1
         else:
             letter_counter[char] = 1
-            letter_probability[char] = probability
-            # Decrease probability with a 1/2^k factor
-            probability *= 0.5
-        # If the counter is full, start the letter removal procedure
-        if len(letter_counter) > k:
-            # Choose a letter to remove based on the probability counter
-            p = random.uniform(0, 1)
-            for char, prob in letter_probability.items():
-                if p < prob:
-                    del letter_counter[char]
-                    del letter_probability[char]
-                    break
-    return letter_counter
+            if len(heap) > k:
+                # Get the smallest count of the heap and replace it if the new character has a bigger count
+                smallest_count = heap[0][0]
+                if smallest_count < letter_counter[char]:
+                    heappop(heap)
+                    heappush(heap,(letter_counter[char],char))
+            else:
+                # Push if the heap is not full yet
+                heappush(heap,(letter_counter[char],char))
+    return heap
 
 def test_estimate_frequent_letters(text, k):
     # Start by computing the exact count for future comparison with estimates
     errors = []
     exact_counts = compute_exact_counts(text)
-    total_error = 0
     # Repeat the approximate count 10 times:
     repetitions = 10
     for i in range(repetitions):
