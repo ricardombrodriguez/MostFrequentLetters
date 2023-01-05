@@ -4,7 +4,11 @@ import re
 import string
 import advertools as adv
 import random
+from time import time
 from heapq import heappush, heappop
+
+DATA_STREAM_REPETITIONS = 10
+K_VALUES = [3, 5, 10]
 
 def compute_exact_counts(text):
     # Compute the exact number of occurrences of each letter using collections library
@@ -30,16 +34,31 @@ def process_file(filename):
         text = text.translate(str.maketrans('', '', string.punctuation)).upper()
     return text
 
-def decreasing_probability_count(text):
-    counter = {}
-    for char in text:
-        if char not in counter:
-            counter[char] = 0
-        count = counter[char]
-        p = random.uniform(0, 1)
-        if p < 1/(2**count):
-            counter[char] += 1
-        
+def decreasing_probability_count(exact_counts,text):
+    errors = []
+    best_counter = None
+    for _ in range(DATA_STREAM_REPETITIONS):
+        counter = {}
+        for char in text:
+            if char not in counter:
+                counter[char] = 0
+            count = counter[char]
+            p = random.uniform(0, 1)
+            if p < 1/(2**count):
+                counter[char] += 1
+        print("decreasing")
+        print(counter)
+        print(exact_counts)
+        error = calculate_error(exact_counts,counter)
+        if not best_counter or error < min(errors):
+            best_counter = counter
+        errors.append(error)
+    average_error = sum(errors) / DATA_STREAM_REPETITIONS
+    highest_error = max(errors)
+    lowest_error = min(errors)
+    print("decreasing")
+    print(best_counter)
+    return best_counter, lowest_error, average_error, highest_error
 
 def space_saving_count(text, k):
     letter_counter = {}
@@ -59,37 +78,50 @@ def space_saving_count(text, k):
             else:
                 # Push if the heap is not full yet
                 heappush(heap,(letter_counter[char],char))
+    print(heap)
     return heap
 
-def test_estimate_frequent_letters(text, k):
-    # Start by computing the exact count for future comparison with estimates
-    errors = []
-    exact_counts = compute_exact_counts(text)
-    # Repeat the approximate count 10 times:
-    repetitions = 10
-    for i in range(repetitions):
-        estimate_counts = space_saving_count(text, k)
-        error = sum(abs(estimate_counts[letter] - exact_counts[letter]) for letter in exact_counts)
-        errors.append(error)
-    average_error = sum(errors) / repetitions
-    highest_error = max(errors)
-    lowest_error = min(errors)
-    print(f"k={k}\nLowest error: {lowest_error}\nAverage error: {average_error}\nHighest error: {highest_error}\n==========")
-    return average_error
-
-def compare_performance(text):
+def execute_methods(text):
     # Compare the performance of the approximate counters and the data stream algorithm
-    k_values = [3, 5, 10]
-    errors = {}
-    for k in k_values:
-        errors[k] = test_estimate_frequent_letters(text, k)
-    return errors
+    
+    # Exact count
+    start = time()
+    exact_counts = compute_exact_counts(text)
+    exact_counts_time = time() - start
+    
+    # Decreasing probability counter (approximate count)
+    start = time()
+    decreasing_probability_counter, lowest_error, average_error, highest_error = decreasing_probability_count(exact_counts,text)
+    decreasing_probability_counter_time = time() - start
+
+    # Space-Saving count for each k € [3,5,10]
+    start = time()
+    space_saving_counts =  { k : space_saving_count(text, k) for k in K_VALUES }
+    space_saving_counts_time = time() - start
+
+    # Compare performance between algorithms
+    compare_performance(exact_counts,decreasing_probability_counter,space_saving_counts)
+
+def calculate_error(exact_counts, method_count):
+    error = sum(abs(method_count[letter] - exact_counts[letter]) for letter in exact_counts)
+    return error
+
+def compare_performance(exact_counts,decreasing_probability_counter,space_saving_counts):
+    
+    print("==================== EXACT COUNT =====================")
+    print(exact_counts.keys())
+
+    print("==================== DECREASING PROBABILITY COUNT =====================")
+    print(decreasing_probability_counter.keys())
+
+    print("==================== SPACE-SAVING COUNT =====================")
+    for k in space_saving_counts:
+        print(f"k={k} | {space_saving_counts[k]}")
 
 def main():
     for filename in os.listdir('files'):
         text = process_file(filename)
-        errors = compare_performance(text)
-        print(errors)
+        execute_methods(text)
 
 if __name__ == '__main__':
     main()
