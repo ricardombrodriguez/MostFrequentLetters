@@ -24,3 +24,29 @@ d) Compare the performance of the approximate counters and the data stream algor
 In addition to exact counters, I need to complement the algorithm with my two assigned methods:
 - **Decreasing probability counter : 1/2^k**
 - **Space-Saving Count**
+
+## How to run
+
+1) Create virtual env
+
+```
+python3 -m venv venv
+```
+
+2) Activate virtual env
+
+```
+source venv/bin/activate
+```
+
+3) Install requirements
+
+```
+pip3 install -r requirements.txt
+```
+
+4) Run main.py
+
+```
+python3 main.py
+```
